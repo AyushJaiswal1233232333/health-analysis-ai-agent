@@ -1,10 +1,10 @@
 import os
 from dotenv import load_dotenv
 import streamlit as st
-from langchain_google_genai import ChatGoogleGenerativeAI
+# FIX: Direct Google official AI library import ki
+import google.generativeai as genai
 
-# 1. FIX: Local aur Production dono ke liye load_dotenv ko smart banaya
-# Agar local `.env` mile toh load karega, varna cloud secrets use karega.
+# Local aur Production dono ke liye load_dotenv configuration
 if os.path.exists(".env"):
     load_dotenv()
 else:
@@ -12,19 +12,16 @@ else:
 
 st.set_page_config(page_title="Blood Work Analyzer", layout="wide")
 
-# 2. FIX: API Key ko explicitly pass kiya taaki Pydantic blank data par crash na ho.
-# Streamlit Secrets mein aapne jo bhi name rakha ho (GOOGLE_API_KEY ya GEMINI_API_KEY), wahi os.getenv mein likhein.
+# API Key fallback routing
 api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 if not api_key:
     st.error("API Key missing! Please check your Streamlit Advanced Secrets configuration.")
     st.stop()
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
-    google_api_key=api_key,
-    temperature=0.1
-)
+# FIX: Direct Google AI Client config aur initialization
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 st.markdown("""
 <style>
@@ -79,10 +76,9 @@ if analyze_clicked:
             st.warning("Please paste a blood work report before analyzing.")
     else:
         with st.spinner("Analyzing your blood work..."):
-
-            # Stage 1: Extract and flag abnormal values
-           # Stage 1: Safe Structure for Invoking Gemini
-            extraction_prompt = f"""
+            try:
+                # Stage 1: Native Extraction
+                extraction_prompt = f"""
 You are a medical data extraction assistant.
 
 From the blood report below, extract ALL test values and classify each one as HIGH, LOW, or NORMAL 
@@ -94,11 +90,12 @@ Format your response exactly as:
 Blood Report:
 {blood_report}
 """
-            # Content ko structured dict me pass karne se production pipeline crash nahi hoti
-            extraction_response = llm.invoke([{"role": "user", "content": extraction_prompt}])
-            extracted_values = extraction_response.content
-            # Stage 2: Health summary and Indian diet plan
-            diet_prompt = f"""
+                # FIX: Native invocation without complex array wrappers
+                extraction_response = model.generate_content(extraction_prompt)
+                extracted_values = extraction_response.text
+
+                # Stage 2: Native Clinical Indian Diet Planner
+                diet_prompt = f"""
 You are a clinical nutritionist specializing in Indian dietary habits.
 
 Based on the blood work analysis below, provide two clearly separated sections:
@@ -113,25 +110,26 @@ like dal, sabzi, roti, rice, etc. Keep it practical and concise.
 Blood Work Analysis:
 {extracted_values}
 """
-            # Safe invoke array structure
-            diet_response = llm.invoke([{"role": "user", "content": diet_prompt}])
-            full_response = diet_response.content
+                diet_response = model.generate_content(diet_prompt)
+                full_response = diet_response.text
 
-        # Split response into two sections
-        if "SECTION 2" in full_response:
-            parts = full_response.split("SECTION 2")
-            health_summary = parts[0].replace("SECTION 1 - HEALTH SUMMARY:", "").replace("SECTION 1", "").strip()
-            diet_plan = ("SECTION 2" + parts[1]).replace("SECTION 2 - INDIAN DIET PLAN:", "").replace("SECTION 2", "").strip()
-        else:
-            health_summary = full_response
-            diet_plan = ""
+                # Split response into two sections
+                if "SECTION 2" in full_response:
+                    parts = full_response.split("SECTION 2")
+                    health_summary = parts[0].replace("SECTION 1 - HEALTH SUMMARY:", "").replace("SECTION 1", "").strip()
+                    diet_plan = ("SECTION 2" + parts[1]).replace("SECTION 2 - INDIAN DIET PLAN:", "").replace("SECTION 2", "").strip()
+                else:
+                    health_summary = full_response
+                    diet_plan = ""
 
-        # Render into fixed-height scrollable boxes
-        health_box.markdown(
-            f'<div class="scroll-box">{health_summary}</div>',
-            unsafe_allow_html=True
-        )
-        diet_box.markdown(
-            f'<div class="scroll-box">{diet_plan if diet_plan else full_response}</div>',
-            unsafe_allow_html=True
-        )
+                # Render into fixed-height scrollable boxes
+                health_box.markdown(
+                    f'<div class="scroll-box">{health_summary}</div>',
+                    unsafe_allow_html=True
+                )
+                diet_box.markdown(
+                    f'<div class="scroll-box">{diet_plan if diet_plan else full_response}</div>',
+                    unsafe_allow_html=True
+                )
+            except Exception as e:
+                st.error(f"Google AI Studio Error: {str(e)}")
