@@ -22,7 +22,8 @@ if not api_key:
 # FIX: Direct Google AI Client config aur initialization
 genai.configure(api_key=api_key)
 # Naye API structure ke liye 'gemini-1.5-flash-latest' ya stable version code use hota hai
-model = genai.GenerativeModel("gemini-1.5-flash-latest")
+# Yeh model string har ek API endpoint aur version par supported hai
+model = genai.GenerativeModel("gemini-pro")
 st.markdown("""
 <style>
 .scroll-box {
