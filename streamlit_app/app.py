@@ -1,12 +1,30 @@
+import os
 from dotenv import load_dotenv
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-load_dotenv(r"C:\Users\hp\OneDrive\Desktop\AI_Agent\.venv\.env")
+# 1. FIX: Local aur Production dono ke liye load_dotenv ko smart banaya
+# Agar local `.env` mile toh load karega, varna cloud secrets use karega.
+if os.path.exists(".env"):
+    load_dotenv()
+else:
+    load_dotenv(r"C:\Users\hp\OneDrive\Desktop\AI_Agent\.venv\.env")
 
 st.set_page_config(page_title="Blood Work Analyzer", layout="wide")
 
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+# 2. FIX: API Key ko explicitly pass kiya taaki Pydantic blank data par crash na ho.
+# Streamlit Secrets mein aapne jo bhi name rakha ho (GOOGLE_API_KEY ya GEMINI_API_KEY), wahi os.getenv mein likhein.
+api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+
+if not api_key:
+    st.error("API Key missing! Please check your Streamlit Advanced Secrets configuration.")
+    st.stop()
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    google_api_key=api_key
+)
+
 st.markdown("""
 <style>
 .scroll-box {
