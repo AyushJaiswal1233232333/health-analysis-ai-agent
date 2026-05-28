@@ -80,21 +80,22 @@ if analyze_clicked:
         with st.spinner("Analyzing your blood work..."):
 
             # Stage 1: Extract and flag abnormal values
+           # Stage 1: Safe Structure for Invoking Gemini
             extraction_prompt = f"""
 You are a medical data extraction assistant.
 
-From the blood report below, extract ALL test values and classify each one as HIGH, LOW, or NORMAL
+From the blood report below, extract ALL test values and classify each one as HIGH, LOW, or NORMAL 
 based on the reference ranges provided in the report.
 
-Format your response as:
+Format your response exactly as:
 - Test Name: value | Status: HIGH/LOW/NORMAL | Reference: range
 
 Blood Report:
 {blood_report}
 """
-            extraction_response = llm.invoke(extraction_prompt)
-            extracted_values = extraction_response.text
-
+            # Content ko structured dict me pass karne se production pipeline crash nahi hoti
+            extraction_response = llm.invoke([{"role": "user", "content": extraction_prompt}])
+            extracted_values = extraction_response.content
             # Stage 2: Health summary and Indian diet plan
             diet_prompt = f"""
 You are a clinical nutritionist specializing in Indian dietary habits.
@@ -105,14 +106,15 @@ SECTION 1 - HEALTH SUMMARY:
 Write 4-5 lines explaining the patient's condition in simple, non-technical language.
 
 SECTION 2 - INDIAN DIET PLAN:
-List foods to eat more of and foods to avoid, using commonly available Indian foods
+List foods to eat more of and foods to avoid, using commonly available Indian foods 
 like dal, sabzi, roti, rice, etc. Keep it practical and concise.
 
 Blood Work Analysis:
 {extracted_values}
 """
-            diet_response = llm.invoke(diet_prompt)
-            full_response = diet_response.text
+            # Safe invoke array structure
+            diet_response = llm.invoke([{"role": "user", "content": diet_prompt}])
+            full_response = diet_response.content
 
         # Split response into two sections
         if "SECTION 2" in full_response:
