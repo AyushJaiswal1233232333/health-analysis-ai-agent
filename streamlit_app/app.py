@@ -6,8 +6,7 @@ load_dotenv(r"C:\Users\hp\OneDrive\Desktop\AI_Agent\.venv\.env")
 
 st.set_page_config(page_title="Blood Work Analyzer", layout="wide")
 
-llm = ChatGoogleGenerativeAI(model="gemma-4-31b-it")
-
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
 st.markdown("""
 <style>
 .scroll-box {
